@@ -11,8 +11,8 @@ class PenumpangController extends Controller
     public function create()
     {
         $travels = Travel::where('tanggal_keberangkatan', '>', now())
-                         ->where('kuota', '>', 0)
-                         ->get();
+            ->where('kuota', '>', 0)
+            ->get();
         return view('penumpang.create', compact('travels'));
     }
 
@@ -24,26 +24,33 @@ class PenumpangController extends Controller
             'data_penumpang' => 'required|string',
             'jenis_kelamin' => 'required|string',
         ]);
-
-        // Mengurai input data_penumpang
+        
+        // $data = ['alvina 21 malang'];
         $data = explode(' ', $request->input('data_penumpang'));
-        if (count($data) < 2) {
+
+        $indeksUsia = -1;
+        foreach ($data as $index => $value) {
+            if (is_numeric($value)) {
+                $indeksUsia = $index;
+                break;
+            }
+        }
+
+        if ($indeksUsia === -1 || count($data) < $indeksUsia + 2) {
             return redirect()->back()->with('error', 'Format input tidak valid. Gunakan format: NAMA USIA KOTA');
         }
-        // dd($data);
-        // $data = ['alvina 21 malang'];
 
-        $usia = $this->parseUsia(array_pop($data));
-        dd($usia);
-        if ($usia === null) {
-            return redirect()->back()->with('error', 'Format usia tidak valid. Gunakan format: 28 TAHUN, 28 THN, atau 28 TH');
-        }
-
-        $nama = strtoupper(implode(' ', $data));
-        $kota = strtoupper(array_pop($data));
+        $nama = implode(' ', array_slice($data, 0, $indeksUsia));
+        // dd($nama);
+        $usia = $this->parseUsia($data[$indeksUsia]);
+        // dd($usia);
+        $kota = implode(' ', array_slice($data, $indeksUsia + 1));
+        // dd($kota);
         $tahunLahir = now()->year - $usia;
 
-        // Mendapatkan travel yang dipilih
+        $nama = strtoupper(trim($nama));
+        $kota = strtoupper(trim($kota));
+
         $travel = Travel::find($request->input('id_travel'));
 
         if ($travel->kuota <= 0) {
@@ -51,18 +58,18 @@ class PenumpangController extends Controller
         }
 
         $existingPenumpang = Penumpang::where('id_travel', $request->input('id_travel'))
-                                      ->where('nama', $nama)
-                                      ->where('usia',$usia)
-                                      ->where('kota',$kota)
-                                      ->first();
+            ->where('nama', $nama)
+            ->where('usia', $usia)
+            ->where('kota', $kota)
+            ->first();
         if ($existingPenumpang) {
             return redirect()->back()->with('error', 'Penumpang yang sama sudah terdaftar di perjalanan ini.');
         }
 
         $kodeBooking = $this->generateKodeBooking($travel->id);
-        dd($kodeBooking);
+        // dd($kodeBooking);
 
-        // Membuat penumpang baru
+
         Penumpang::create([
             'id_travel' => $request->input('id_travel'),
             'kode_booking' => $kodeBooking,
@@ -98,10 +105,10 @@ class PenumpangController extends Controller
 
     private function generateKodeBooking($idTravel)
     {
-        $prefix = now()->format('y') . now()->format('m'); // 2 digit tahun dan 2 digit bulan
-        $travelId = str_pad($idTravel, 4, '0', STR_PAD_LEFT); // 4 digit id travel
-        $penumpangCount = Penumpang::where('id_travel', $idTravel)->count() + 1; // Nomor urut
-        $sequence = str_pad($penumpangCount, 4, '0', STR_PAD_LEFT); // 4 digit nomor urut
+        $prefix = now()->format('y') . now()->format('m');
+        $travelId = str_pad($idTravel, 4, '0', STR_PAD_LEFT);
+        $penumpangCount = Penumpang::where('id_travel', $idTravel)->count() + 1;
+        $sequence = str_pad($penumpangCount, 4, '0', STR_PAD_LEFT);
 
         return $prefix . $travelId . $sequence;
     }
